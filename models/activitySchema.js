@@ -1,0 +1,64 @@
+const mongoose = require("mongoose");
+
+const activitySchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["senate", "house"] },
+    title: { type: String, required: true },
+    activityquorumId: String,
+    shortDesc: String,
+    longDesc: {
+      type: String,
+      trim: true,
+    },
+    rollCall: String,
+    readMore: { type: String, default: "" },
+    date: Date,
+    congress: { type: String },
+    trackActivities: {
+      type: String,
+      enum: ["completed", "pending", "failed"],
+    },
+    status: {
+      type: String,
+      enum: ["draft", "published", "under review"],
+      default: "draft",
+    },
+    editedFields: {
+      type: [String],
+      default: [],
+    },
+    fieldEditors: {
+      type: Map,
+      of: new mongoose.Schema(
+        {
+          editorId: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
+          editorName: String,
+          editedAt: { type: Date, default: Date.now },
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
+    history: [
+      {
+        oldData: Object,
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+        actionType: {
+          type: String,
+          enum: ["update", "delete"],
+          default: "update",
+        },
+      },
+    ],
+    snapshotSource: {
+      type: String,
+      enum: ["deleted_pending_update", "edited"],
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("activities", activitySchema);
