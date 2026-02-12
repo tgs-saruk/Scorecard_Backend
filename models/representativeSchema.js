@@ -2,12 +2,15 @@ const mongoose = require("mongoose");
 const RepresentativeSchema = new mongoose.Schema(
   {
     name: String,
+    displayAlternateProfileLink: { type: Boolean, default: false },
+    alternateProfileLink: { type: String,default: ""},
     repId: String,
     district: String,
     party: { type: String, enum: ["democrat", "independent", "republican"] },
     photo: String,
     status: { type: String, enum: ["active", "former"] },
-    isNew: { type: Boolean, default: false },
+    isFormerMember: { type: Boolean, default: false },
+    isNewRecord: { type: Boolean, default: false },
     publishStatus: {
       type: String,
       enum: ["draft", "published", "under review"],
@@ -31,7 +34,7 @@ const RepresentativeSchema = new mongoose.Schema(
           editorName: String,
           editedAt: { type: Date, default: Date.now },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {},
     },
@@ -55,10 +58,10 @@ const RepresentativeSchema = new mongoose.Schema(
       enum: ["deleted_pending_update", "edited"],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Ensure repId is unique to prevent duplicates from Quorum fetches
-RepresentativeSchema.index({ repId: 1 }, { unique: true});
+RepresentativeSchema.index({ repId: 1 }, { unique: true });
 
 module.exports = mongoose.model("representatives", RepresentativeSchema);

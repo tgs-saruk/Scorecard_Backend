@@ -23,11 +23,15 @@ async function buildSupportData(doc, isActivity = false) {
     : {
         yea: [],
         nay: [],
+        present: [],
+        missed: [],
         other: [],
         participation: {
           totalVotes: 0,
           yeaVotes: 0,
           nayVotes: 0,
+          presentVotes: 0,
+          missedVotes: 0,
           otherVotes: 0,
           senateCount: 0,
           houseCount: 0,
@@ -35,6 +39,10 @@ async function buildSupportData(doc, isActivity = false) {
       };
 
   if (!doc) return supportData;
+
+  console.log(
+    `[SUPPORT-DATA-START] Building support data for ${isActivity ? "activity" : "vote"} ID: ${doc._id}`,
+  );
 
   try {
     const [senatorDocs, repDocs] = await Promise.all([
@@ -60,7 +68,7 @@ async function buildSupportData(doc, isActivity = false) {
       ).find(
         (s) =>
           s[isActivity ? "activityId" : "voteId"]?.toString() ===
-          doc._id.toString()
+          doc._id.toString(),
       );
 
       if (scoreEntry && senData.senateId) {
@@ -77,10 +85,14 @@ async function buildSupportData(doc, isActivity = false) {
         if (isActivity) {
           if (score === "yes") supportData.yes.push(info);
           else if (score === "no") supportData.no.push(info);
+          else if (score === "present") supportData.present.push(info);
+          else if (score === "missed") supportData.missed.push(info);
           else supportData.other.push(info);
         } else {
           if (score === "yea") supportData.yea.push(info);
           else if (score === "nay") supportData.nay.push(info);
+          else if (score === "present") supportData.present.push(info);
+          else if (score === "missed") supportData.missed.push(info);
           else supportData.other.push(info);
         }
       }
@@ -93,10 +105,11 @@ async function buildSupportData(doc, isActivity = false) {
       ).find(
         (s) =>
           s[isActivity ? "activityId" : "voteId"]?.toString() ===
-          doc._id.toString()
+          doc._id.toString(),
       );
 
       if (scoreEntry && repData.houseId) {
+        const score = scoreEntry.score?.toLowerCase();
         const info = {
           _id: repData.houseId._id,
           name: normalizeName(repData.houseId.name),
@@ -107,7 +120,6 @@ async function buildSupportData(doc, isActivity = false) {
           chamber: "house",
         };
 
-        const score = scoreEntry.score?.toLowerCase();
         if (isActivity) {
           if (score === "yes") supportData.yes.push(info);
           else if (score === "no") supportData.no.push(info);
@@ -115,6 +127,12 @@ async function buildSupportData(doc, isActivity = false) {
         } else {
           if (score === "yea") supportData.yea.push(info);
           else if (score === "nay") supportData.nay.push(info);
+          else if (score === "present") {
+            console.log(
+              `[DEBUG-PRESENT] Adding present vote for rep: ${info.name || "NO_NAME"}, houseId: ${repData.houseId._id}, raw name from schema: "${repData.houseId.name}"`,
+            );
+            supportData.present.push(info);
+          } else if (score === "missed") supportData.missed.push(info);
           else supportData.other.push(info);
         }
       }
@@ -147,23 +165,33 @@ async function buildSupportData(doc, isActivity = false) {
       totalVotes:
         supportData.yea.length +
         supportData.nay.length +
+        supportData.present.length +
+        supportData.missed.length +
         supportData.other.length,
       yeaVotes: supportData.yea.length,
       nayVotes: supportData.nay.length,
+      presentVotes: supportData.present.length,
+      missedVotes: supportData.missed.length,
       otherVotes: supportData.other.length,
       senateCount:
         supportData.yea.filter((m) => m.chamber === "senate").length +
         supportData.nay.filter((m) => m.chamber === "senate").length +
+        supportData.present.filter((m) => m.chamber === "senate").length +
+        supportData.missed.filter((m) => m.chamber === "senate").length +
         supportData.other.filter((m) => m.chamber === "senate").length,
       houseCount:
         supportData.yea.filter((m) => m.chamber === "house").length +
         supportData.nay.filter((m) => m.chamber === "house").length +
+        supportData.present.filter((m) => m.chamber === "house").length +
+        supportData.missed.filter((m) => m.chamber === "house").length +
         supportData.other.filter((m) => m.chamber === "house").length,
     };
+    console.log(
+      `[SUPPORT-DATA-FINAL] voteId=${doc._id} present=${supportData.present.length} presentNames=[${supportData.present.map((p) => p.name).join(", ")}]`,
+    );
   }
 
   return supportData;
 }
 
 module.exports = { buildSupportData };
-

@@ -75,7 +75,7 @@ async function updateVoteScore(quorumId, editorInfo, apiClient, requestQueue, mo
       },
     ];
 
-    const votes = ["yea", "nay", "present", "other"];
+    const votes = ["yea", "nay", "present","missed", "other"];
     const voteUris = votes.flatMap((score) => data[`${score}_votes`] || []);
     const personIds = voteUris
       .map((uri) => uri?.replace(/\/$/, "").split("/").pop())

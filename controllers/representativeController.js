@@ -5,7 +5,7 @@ const upload = require("../middlewares/fileUploads");
 class representativeController {
   static createHouse = async (req, res) => {
     try {
-      const { name, district, party, status, isNew } = req.body;
+      const { name, district, party, status, isNewRecord } = req.body;
 
       const photo = req.file ? req.file.filename : null;
 
@@ -15,7 +15,7 @@ class representativeController {
         party,
         photo,
         status,
-        isNew: !!isNew,
+        isNewRecord: !!isNewRecord,
         publishStatus: "draft",
       });
 
@@ -43,7 +43,9 @@ class representativeController {
       }
 
       const house = await House.find(filter)
-        .select("name repId district party photo status publishStatus isNew")
+        .select(
+          "name repId district party photo status publishStatus isNewRecord",
+        )
         .lean();
 
       res.status(200).json(house);
@@ -77,7 +79,7 @@ class representativeController {
         ...(status && { status: new RegExp(`^${status}$`, "i") }),
       };
       const houses = await House.find(filter)
-        .select("_id name district party photo status isNew")
+        .select("_id name district party photo status isNewRecord")
         .lean();
       const houseIds = houses.map((house) => house._id);
       const allRatingData = await RepresentativeData.aggregate([
@@ -110,7 +112,7 @@ class representativeController {
         },
       ]);
       const ratingMap = new Map(
-        allRatingData.map((item) => [item.houseId.toString(), item])
+        allRatingData.map((item) => [item.houseId.toString(), item]),
       );
       const housesWithRatings = houses.map((house) => {
         const ratingInfo = ratingMap.get(house._id.toString()) || {};
@@ -123,7 +125,7 @@ class representativeController {
           party: house.party,
           photo: house.photo,
           status: house.status,
-          isNew: house.isNew || false,
+          isNewRecord: house.isNewRecord || false,
           rating: ratingInfo.rating || "N/A",
           isCurrentTerm: ratingInfo.currentTerm || false,
           //summary: ratingInfo.summary || null,
@@ -292,7 +294,7 @@ class representativeController {
                 ...cleanData,
                 createdAt: data.createdAt,
               });
-            }
+            },
           );
           await Promise.all(recreatePromises);
         }
@@ -347,7 +349,7 @@ class representativeController {
       const updatedRepresentative = await House.findByIdAndUpdate(
         id,
         { publishStatus },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       );
 
       if (!updatedRepresentative) {

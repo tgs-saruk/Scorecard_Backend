@@ -3,12 +3,12 @@ const router = express.Router();
 const SenatorDataController = require('../controllers/senatorDataController');
 const protectedKey = require('../middlewares/protectedKey');
 
-router.post('/senator-data/', SenatorDataController.createSenatorData);
-router.get('/senator-data/', protectedKey, SenatorDataController.getAllSenatorData);
-router.get('/senator-data/viewID/:id', protectedKey, SenatorDataController.getSenatorDataById);
-router.get('/senator-data/viewbysenator/:id', protectedKey, SenatorDataController.getSenatorDataBySenatorId);
-router.put('/senator-data/:id', SenatorDataController.updateSenatorData);
-router.delete('/senator-data/:id', SenatorDataController.deleteSenatorData);
+router.post('/admin/senator-data/', SenatorDataController.createSenatorData);
+router.get('/admin/senator-data/', protectedKey, SenatorDataController.getAllSenatorData);
+router.get('/admin/senator-data/viewID/:id', protectedKey, SenatorDataController.getSenatorDataById);
+router.get('/admin/senator-data/viewbysenator/:id', protectedKey, SenatorDataController.getSenatorDataBySenatorId);
+router.put('/admin/senator-data/:id', SenatorDataController.updateSenatorData);
+router.delete('/admin/senator-data/:id', SenatorDataController.deleteSenatorData);
 router.get(
   "/senators-past-votes/:senateId/",
   protectedKey,
@@ -20,7 +20,7 @@ router.get(
   SenatorDataController.SenatorDataBySenatorId
 );
 router.post(
-  "/bulk-publish",protectedKey,
+  "/admin/bulk-publish",protectedKey,
   protectedKey,
   SenatorDataController.bulkPublish
 );

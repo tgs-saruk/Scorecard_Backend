@@ -7,7 +7,7 @@ class senatorController {
   // Create a new senator with photo upload
   static createSenator = async (req, res) => {
     try {
-      const { name, state, party, status, isNew } = req.body;
+      const { name, state, party, status, isNewRecord } = req.body;
 
       const photo = req.file ? req.file.filename : null; // If a file is uploaded, use its path, otherwise null
 
@@ -17,7 +17,7 @@ class senatorController {
         party,
         photo, // Store the photo path in the database
         status,
-        isNew: !!isNew,
+        isNewRecord: !!isNewRecord,
         publishStatus: "draft", // Default publish status
       });
 
@@ -47,7 +47,9 @@ class senatorController {
       }
 
       const senators = await Senator.find(filter)
-        .select("name state party photo status senatorId publishStatus isNew")
+        .select(
+          "name state party photo status senatorId publishStatus isNewRecord",
+        )
         .lean();
 
       res.status(200).json(senators);
@@ -98,7 +100,7 @@ class senatorController {
         Senator.find(filter)
           .lean()
           .select(
-            "_id senatorId name state party photo status publishStatus isNew"
+            "_id senatorId name state party photo status publishStatus isNewRecord",
           )
           .skip(skip)
           .limit(limitNum > 0 ? limitNum : null),
@@ -317,7 +319,7 @@ class senatorController {
       const updatedSenator = await Senator.findByIdAndUpdate(
         senatorId,
         updateData,
-        { new: true }
+        { new: true },
       );
 
       if (!updatedSenator) {
@@ -397,7 +399,7 @@ class senatorController {
       const updated = await Senator.findByIdAndUpdate(
         id,
         { published },
-        { new: true }
+        { new: true },
       );
 
       if (!updated) {
@@ -449,7 +451,7 @@ class senatorController {
       const updatedSenator = await Senator.findByIdAndUpdate(
         id,
         { publishStatus },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       );
 
       if (!updatedSenator) {

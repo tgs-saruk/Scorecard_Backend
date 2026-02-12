@@ -3,11 +3,14 @@ const mongoose = require("mongoose");
 const SenatorSchema = new mongoose.Schema(
   {
     name: String,
+    displayAlternateProfileLink: { type: Boolean, default: false },
+    alternateProfileLink: { type: String, default: "" },
     state: String,
     party: { type: String, enum: ["democrat", "independent", "republican"] },
     photo: String,
     status: { type: String, enum: ["active", "former"] },
-    isNew: { type: Boolean, default: false },
+    isFormerMember: { type: Boolean, default: false },
+    isNewRecord: { type: Boolean, default: false },
     senatorId: String,
     publishStatus: {
       type: String,
@@ -32,7 +35,7 @@ const SenatorSchema = new mongoose.Schema(
           editorName: String,
           editedAt: { type: Date, default: Date.now },
         },
-        { _id: false }
+        { _id: false },
       ),
       default: {},
     },
@@ -57,7 +60,7 @@ const SenatorSchema = new mongoose.Schema(
     },
     modifiedAt: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Ensure senatorId is unique to prevent duplicates from Quorum fetches

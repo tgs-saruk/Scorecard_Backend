@@ -11,7 +11,7 @@ class SessionService {
         fullName: user.fullName,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "30d" }
     );
   }
 

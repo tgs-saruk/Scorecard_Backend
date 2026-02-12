@@ -58,8 +58,8 @@ app.use(
   express.static(path.join(__dirname, "uploads/documents"))
 );
 
-app.use("/user", userRoute);
-app.use("/", sendInviteRoute);
+app.use("/v1/user", userRoute);
+app.use("/v1/", sendInviteRoute);
 app.use("/v1", senatorRoute);
 app.use("/v1", senatorDataRoute);
 app.use("/term", termRoute);
@@ -67,10 +67,10 @@ app.use("/v1", voteRoute);
 app.use("/v1", activityRoute);
 app.use("/v1", houseRoute);
 app.use("/v1", houseDataRoute);
-app.use("/fetch-quorum", getquorumRoute);
-app.use("/dummy-data", dummyDataRoute);
-app.use("/otp", otpRoute);
-app.use("/auth/2fa", twoFactorRoute); 
+app.use("/v1/fetch-quorum", getquorumRoute);
+app.use("/v1/dummy-data", dummyDataRoute);
+app.use("/v1/otp", otpRoute);
+app.use("/v1/auth/2fa", twoFactorRoute); 
 app.get("/", (req, res) => {
   res.send("Welcome to the homepage!");
 });

@@ -655,7 +655,7 @@ class houseDataController {
   //       party: sourceData.party || houseDocument.party,
   //       photo: sourceData.photo || houseDocument.photo,
   //       status: sourceData.status || houseDocument.status,
-  //       isNew: sourceData.isNew || houseDocument.isNew,
+  //       isNewRecord: sourceData.isNewRecord || houseDocument.isNewRecord,
   //       publishStatus: isHistorical ? "published" : houseDocument.publishStatus,
   //       createdAt: houseDocument.createdAt,
   //       updatedAt: isHistorical
@@ -855,7 +855,7 @@ class houseDataController {
         party: sourceData.party || houseDocument.party,
         photo: sourceData.photo || houseDocument.photo,
         status: sourceData.status || houseDocument.status,
-        isNew: sourceData.isNew || houseDocument.isNew,
+        isNewRecord: sourceData.isNewRecord || houseDocument.isNewRecord,
         publishStatus: isHistorical ? "published" : houseDocument.publishStatus,
         createdAt: houseDocument.createdAt,
         updatedAt: isHistorical

@@ -259,7 +259,7 @@ class senatorDataController {
         .populate("termId", "-__v -createdAt -updatedAt")
         .populate(
           "senateId",
-          "name state party photo status senatorId publishStatus"
+          "name state party photo status senatorId publishStatus",
         )
         .populate({
           path: "votesScore.voteId",
@@ -383,7 +383,7 @@ class senatorDataController {
         party: sourceData.party || senatorDocument.party,
         photo: sourceData.photo || senatorDocument.photo,
         status: sourceData.status || senatorDocument.status,
-        isNew: sourceData.isNew || senatorDocument.isNew,
+        isNewRecord: sourceData.isNewRecord || senatorDocument.isNewRecord,
         senatorId: sourceData.senatorId || senatorDocument.senatorId,
         publishStatus: isHistorical
           ? "published"
@@ -407,13 +407,13 @@ class senatorDataController {
         const allVoteIds = historicalTerms.flatMap((t) => {
           const votesScoreIds = (t.votesScore || []).map((v) => v.voteId);
           const pastVotesScoreIds = (t.pastVotesScore || []).map(
-            (v) => v.voteId
+            (v) => v.voteId,
           );
           return [...votesScoreIds, ...pastVotesScoreIds];
         });
 
         const allActivityIds = historicalTerms.flatMap((t) =>
-          (t.activitiesScore || []).map((a) => a.activityId)
+          (t.activitiesScore || []).map((a) => a.activityId),
         );
 
         const [termDocs, voteDocs, activityDocs] = await Promise.all([
@@ -423,13 +423,13 @@ class senatorDataController {
         ]);
 
         const termMap = Object.fromEntries(
-          termDocs.map((d) => [String(d._id), d])
+          termDocs.map((d) => [String(d._id), d]),
         );
         const voteMap = Object.fromEntries(
-          voteDocs.map((d) => [String(d._id), cleanVoteOrActivity(d)])
+          voteDocs.map((d) => [String(d._id), cleanVoteOrActivity(d)]),
         );
         const activityMap = Object.fromEntries(
-          activityDocs.map((d) => [String(d._id), cleanVoteOrActivity(d)])
+          activityDocs.map((d) => [String(d._id), cleanVoteOrActivity(d)]),
         );
 
         const populatedTerms = historicalTerms.map((term) => ({
@@ -462,32 +462,32 @@ class senatorDataController {
             .populate("termId", "_id name startYear endYear congresses")
             .populate(
               "votesScore.voteId",
-              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress"
+              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress",
             )
             .populate(
               // ADDED: populate pastVotesScore
               "pastVotesScore.voteId",
-              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress"
+              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress",
             )
             .populate(
               "activitiesScore.activityId",
-              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress"
+              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress",
             )
             .lean(),
           SenatorData.find({ senateId, currentTerm: { $ne: true } })
             .populate("termId", "_id name startYear endYear congresses")
             .populate(
               "votesScore.voteId",
-              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress"
+              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress",
             )
             .populate(
               // ADDED: populate pastVotesScore
               "pastVotesScore.voteId",
-              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress"
+              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress",
             )
             .populate(
               "activitiesScore.activityId",
-              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress"
+              "_id title shortDesc longDesc rollCall readMore sbaPosition date congress",
             )
             .sort({ "termId.startYear": -1, createdAt: -1 })
             .lean(),
@@ -614,492 +614,554 @@ class senatorDataController {
     }
   }
 
-static async bulkPublish(req, res) {
-  try {
-    const { senatorIds = [] } = req.body;
-    if (!Array.isArray(senatorIds) || senatorIds.length === 0) {
-      console.warn("⚠️ No senator IDs provided");
-      return res.status(400).json({ message: "No senators selected" });
-    }
-    const terms = await Term.find().lean();
-    let successCount = 0;
-    const errors = [];
+  static async bulkPublish(req, res) {
+    try {
+      const { senatorIds = [] } = req.body;
+      if (!Array.isArray(senatorIds) || senatorIds.length === 0) {
+        console.warn("⚠️ No senator IDs provided");
+        return res.status(400).json({ message: "No senators selected" });
+      }
+      const terms = await Term.find().lean();
+      let successCount = 0;
+      const errors = [];
 
-    for (const senateId of senatorIds) {
-      try {
-        let hasError = false;
-        const senatorErrors = [];
+      for (const senateId of senatorIds) {
+        try {
+          let hasError = false;
+          const senatorErrors = [];
 
-        /* ------------------ FETCH SENATOR DATA ------------------ */
-        const termRecords = await SenatorData.find({ senateId })
-          .populate("termId")
-          .populate("votesScore.voteId")
-          .populate("activitiesScore.activityId")
-          .populate("pastVotesScore.voteId")
-          .lean();
+          /* ------------------ FETCH SENATOR DATA ------------------ */
+          const termRecords = await SenatorData.find({ senateId })
+            .populate("termId")
+            .populate("votesScore.voteId")
+            .populate("activitiesScore.activityId")
+            .populate("pastVotesScore.voteId")
+            .lean();
 
-        if (termRecords && termRecords.length > 0) {
-          // Create a DEEP COPY of termRecords for processing
-          const termRecordsCopy = JSON.parse(JSON.stringify(termRecords));
+          if (termRecords && termRecords.length > 0) {
+            // Create a DEEP COPY of termRecords for processing
+            const termRecordsCopy = JSON.parse(JSON.stringify(termRecords));
 
-          // Track moves needed
-          const votesToMoveBetweenTerms = []; // { fromTermId, toTermId, voteScore }
-          const activitiesToMoveBetweenTerms = []; // { fromTermId, toTermId, activityScore }
+            // Track moves needed
+            const votesToMoveBetweenTerms = []; // { fromTermId, toTermId, voteScore }
+            const activitiesToMoveBetweenTerms = []; // { fromTermId, toTermId, activityScore }
 
-          // Track unique vote/activity IDs to detect duplicates
-          const seenVoteIds = new Set();
-          const seenActivityIds = new Set();
-          const duplicateVotes = new Set();
-          const duplicateActivities = new Set();
+            // Track unique vote/activity IDs to detect duplicates
+            const seenVoteIds = new Set();
+            const seenActivityIds = new Set();
+            const duplicateVotes = new Set();
+            const duplicateActivities = new Set();
 
-          // First pass: Check ALL votes/activities for term matching
-          for (const term of termRecordsCopy) {
-            /* -------- CHECK VOTES -------- */
-            if (Array.isArray(term.votesScore) && term.votesScore.length > 0) {
-              for (let i = 0; i < term.votesScore.length; i++) {
-                const voteScore = term.votesScore[i];
-                const voteDoc = voteScore.voteId;
-                const voteId = voteDoc?._id || voteScore.voteId;
-                const voteDate = voteDoc?.date;
-                // Check for duplicate votes
-                const voteIdStr = voteId.toString();
-                if (seenVoteIds.has(voteIdStr)) {
-                  duplicateVotes.add(voteIdStr);
-                } else {
-                  seenVoteIds.add(voteIdStr);
-                }
-
-                if (!voteDate) {
-                  hasError = true;
-                  senatorErrors.push(`Vote (ID: ${voteId}): Term is required - no date found`);
-                  continue;
-                }
-
-                const match = await findMatchingTerm(termRecordsCopy, terms, voteDate);
-
-                if (!match) {
-                  hasError = true;
-                  senatorErrors.push(`Vote (ID: ${voteId}, date: ${voteDate}): Term is required`);
-                } else if (match.type === "past") {
-                } else if (match.type === "current") {
-                  // Check if vote is in the correct term
-                  const correctTermId = match.term._id.toString();
-                  const currentTermId = term._id.toString();
-                  
-                  if (correctTermId === currentTermId) {
+            // First pass: Check ALL votes/activities for term matching
+            for (const term of termRecordsCopy) {
+              /* -------- CHECK VOTES -------- */
+              if (
+                Array.isArray(term.votesScore) &&
+                term.votesScore.length > 0
+              ) {
+                for (let i = 0; i < term.votesScore.length; i++) {
+                  const voteScore = term.votesScore[i];
+                  const voteDoc = voteScore.voteId;
+                  const voteId = voteDoc?._id || voteScore.voteId;
+                  const voteDate = voteDoc?.date;
+                  // Check for duplicate votes
+                  const voteIdStr = voteId.toString();
+                  if (seenVoteIds.has(voteIdStr)) {
+                    duplicateVotes.add(voteIdStr);
                   } else {
-                    // Track for moving later
-                    votesToMoveBetweenTerms.push({
-                      fromTermId: currentTermId,
-                      toTermId: correctTermId,
-                      voteScore: voteScore,
-                      voteId: voteIdStr
-                    });
+                    seenVoteIds.add(voteIdStr);
+                  }
+
+                  if (!voteDate) {
+                    hasError = true;
+                    senatorErrors.push(
+                      `Vote (ID: ${voteId}): Term is required - no date found`,
+                    );
+                    continue;
+                  }
+
+                  const match = await findMatchingTerm(
+                    termRecordsCopy,
+                    terms,
+                    voteDate,
+                  );
+
+                  if (!match) {
+                    hasError = true;
+                    senatorErrors.push(
+                      `Vote (ID: ${voteId}, date: ${voteDate}): Term is required`,
+                    );
+                  } else if (match.type === "past") {
+                  } else if (match.type === "current") {
+                    // Check if vote is in the correct term
+                    const correctTermId = match.term._id.toString();
+                    const currentTermId = term._id.toString();
+
+                    if (correctTermId === currentTermId) {
+                    } else {
+                      // Track for moving later
+                      votesToMoveBetweenTerms.push({
+                        fromTermId: currentTermId,
+                        toTermId: correctTermId,
+                        voteScore: voteScore,
+                        voteId: voteIdStr,
+                      });
+                    }
+                  }
+                }
+              } else {
+                console.log(`\n🗳️ VOTES: None`);
+              }
+
+              /* -------- CHECK ACTIVITIES -------- */
+              if (
+                Array.isArray(term.activitiesScore) &&
+                term.activitiesScore.length > 0
+              ) {
+                for (let i = 0; i < term.activitiesScore.length; i++) {
+                  const actScore = term.activitiesScore[i];
+                  const actDoc = actScore.activityId;
+                  const actId = actDoc?._id || actScore.activityId;
+                  const actDate = actDoc?.date;
+                  // Check for duplicate activities
+                  const actIdStr = actId.toString();
+                  if (seenActivityIds.has(actIdStr)) {
+                    duplicateActivities.add(actIdStr);
+                  } else {
+                    seenActivityIds.add(actIdStr);
+                  }
+
+                  if (!actDate) {
+                    hasError = true;
+                    senatorErrors.push(
+                      `Activity (ID: ${actId}): Term is required - no date found`,
+                    );
+                    continue;
+                  }
+
+                  const match = await findMatchingTerm(
+                    termRecordsCopy,
+                    terms,
+                    actDate,
+                  );
+
+                  if (!match) {
+                    hasError = true;
+                    senatorErrors.push(
+                      `Activity (ID: ${actId}, date: ${actDate}): Term is required`,
+                    );
+                  } else if (match.type === "current") {
+                    // Check if activity is in the correct term
+                    const correctTermId = match.term._id.toString();
+                    const currentTermId = term._id.toString();
+
+                    if (correctTermId === currentTermId) {
+                    } else {
+                      // Track for moving later
+                      activitiesToMoveBetweenTerms.push({
+                        fromTermId: currentTermId,
+                        toTermId: correctTermId,
+                        activityScore: actScore,
+                        activityId: actIdStr,
+                      });
+                    }
+                  }
+                }
+              } else {
+                console.log(`\n🏃 ACTIVITIES: None`);
+              }
+            }
+            /* -------- REMOVE DUPLICATES WITHIN SAME TERM -------- */
+            let sameTermDupActivities = 0;
+            let sameTermDupVotes = 0;
+
+            // Check each term for duplicates within itself
+            for (const term of termRecords) {
+              const termId = term._id.toString();
+
+              /* -------- CHECK ACTIVITY DUPLICATES WITHIN TERM -------- */
+              if (
+                Array.isArray(term.activitiesScore) &&
+                term.activitiesScore.length > 0
+              ) {
+                const seenActIds = new Set();
+                const uniqueActivities = [];
+                const duplicateActIds = [];
+
+                for (const actScore of term.activitiesScore) {
+                  const actId = (
+                    actScore.activityId?._id || actScore.activityId
+                  ).toString();
+
+                  if (seenActIds.has(actId)) {
+                    duplicateActIds.push(actId);
+                    sameTermDupActivities++;
+                  } else {
+                    seenActIds.add(actId);
+                    uniqueActivities.push(actScore);
+                  }
+                }
+
+                // Update if duplicates found
+                if (duplicateActIds.length > 0) {
+                  await SenatorData.findByIdAndUpdate(
+                    termId,
+                    { activitiesScore: uniqueActivities },
+                    { new: true },
+                  );
+                }
+              }
+
+              /* -------- CHECK VOTE DUPLICATES WITHIN TERM -------- */
+              if (
+                Array.isArray(term.votesScore) &&
+                term.votesScore.length > 0
+              ) {
+                const seenVoteIds = new Set();
+                const uniqueVotes = [];
+                const duplicateVoteIds = [];
+
+                for (const voteScore of term.votesScore) {
+                  const voteId = (
+                    voteScore.voteId?._id || voteScore.voteId
+                  ).toString();
+
+                  if (seenVoteIds.has(voteId)) {
+                    duplicateVoteIds.push(voteId);
+                    sameTermDupVotes++;
+                  } else {
+                    seenVoteIds.add(voteId);
+                    uniqueVotes.push(voteScore);
+                  }
+                }
+
+                // Update if duplicates found
+                if (duplicateVoteIds.length > 0) {
+                  await SenatorData.findByIdAndUpdate(
+                    termId,
+                    { votesScore: uniqueVotes },
+                    { new: true },
+                  );
+                }
+              }
+            }
+            // If ANY critical error found, skip this senator entirely
+            if (hasError) {
+              errors.push({
+                senatorId: senateId,
+                message: "Critical errors found",
+                details: senatorErrors,
+              });
+              continue;
+            }
+            // Create a map of term records for easy access
+            const termRecordsMap = {};
+            termRecords.forEach((tr) => {
+              termRecordsMap[tr._id.toString()] = tr;
+            });
+
+            /* -------- MOVE MISPLACED VOTES BETWEEN TERMS -------- */
+            if (votesToMoveBetweenTerms.length > 0) {
+              // Group moves by destination term and track which votes are being moved
+              const movesByDestTerm = {};
+              const votesBeingMoved = new Set(); // Track vote IDs that are being moved
+
+              votesToMoveBetweenTerms.forEach((move) => {
+                if (!movesByDestTerm[move.toTermId]) {
+                  movesByDestTerm[move.toTermId] = [];
+                }
+                movesByDestTerm[move.toTermId].push(move);
+                votesBeingMoved.add(move.voteId);
+              });
+
+              // FIRST: Remove votes from ALL terms where they shouldn't be
+              // A vote should only exist in its correct term
+              const votesToRemoveFromAllTerms = new Set(votesBeingMoved);
+
+              // Process each term to remove votes that are being moved elsewhere
+              for (const term of termRecords) {
+                const termId = term._id.toString();
+                const votesInThisTerm = term.votesScore || [];
+
+                // Filter out votes that are being moved to OTHER terms
+                // But keep votes that are staying in this term (correct placement)
+                const remainingVotes = votesInThisTerm.filter((voteScore) => {
+                  const voteId = (
+                    voteScore.voteId?._id || voteScore.voteId
+                  ).toString();
+
+                  // Check if this vote is marked to be moved FROM this term
+                  const isMovingFromThisTerm = votesToMoveBetweenTerms.some(
+                    (move) =>
+                      move.fromTermId === termId && move.voteId === voteId,
+                  );
+
+                  // Check if this vote is marked to be moved TO this term (keep it)
+                  const isMovingToThisTerm = votesToMoveBetweenTerms.some(
+                    (move) =>
+                      move.toTermId === termId && move.voteId === voteId,
+                  );
+
+                  // Keep vote if:
+                  // 1. It's not being moved at all, OR
+                  // 2. It's being moved TO this term (its correct destination)
+                  return !isMovingFromThisTerm || isMovingToThisTerm;
+                });
+
+                // Update the term if votes were removed
+                if (remainingVotes.length !== votesInThisTerm.length) {
+                  await SenatorData.findByIdAndUpdate(
+                    termId,
+                    { votesScore: remainingVotes },
+                    { new: true },
+                  );
+                }
+              }
+
+              // SECOND: Add votes to their correct destination terms
+              // But first, ensure we don't add duplicates
+              for (const [toTermId, moves] of Object.entries(movesByDestTerm)) {
+                const destTerm = termRecordsMap[toTermId];
+                if (!destTerm) continue;
+
+                // Get current votes in destination term
+                const currentVotes = destTerm.votesScore || [];
+
+                // Create a set of vote IDs already in destination term
+                const existingVoteIds = new Set();
+                currentVotes.forEach((vote) => {
+                  const voteId = (vote.voteId?._id || vote.voteId).toString();
+                  existingVoteIds.add(voteId);
+                });
+
+                // Filter moves to only add votes that aren't already in the destination
+                const votesToAdd = [];
+                const duplicateVotesSkipped = [];
+
+                moves.forEach((move) => {
+                  if (existingVoteIds.has(move.voteId)) {
+                    duplicateVotesSkipped.push(move.voteId);
+                  } else {
+                    votesToAdd.push(move.voteScore);
+                    existingVoteIds.add(move.voteId); // Add to set to prevent duplicates in this batch
+                  }
+                });
+
+                // Only update if we have votes to add
+                if (votesToAdd.length > 0) {
+                  const updatedVotes = [...currentVotes, ...votesToAdd];
+
+                  await SenatorData.findByIdAndUpdate(
+                    toTermId,
+                    { votesScore: updatedVotes },
+                    { new: true },
+                  );
+                }
+              }
+            }
+
+            /* -------- MOVE MISPLACED ACTIVITIES BETWEEN TERMS -------- */
+            if (activitiesToMoveBetweenTerms.length > 0) {
+              // Group moves by destination term and track which activities are being moved
+              const movesByDestTerm = {};
+              const activitiesBeingMoved = new Set();
+
+              activitiesToMoveBetweenTerms.forEach((move) => {
+                if (!movesByDestTerm[move.toTermId]) {
+                  movesByDestTerm[move.toTermId] = [];
+                }
+                movesByDestTerm[move.toTermId].push(move);
+                activitiesBeingMoved.add(move.activityId);
+              });
+
+              // FIRST: Remove activities from ALL terms where they shouldn't be
+              const activitiesToRemoveFromAllTerms = new Set(
+                activitiesBeingMoved,
+              );
+
+              // Process each term to remove activities that are being moved elsewhere
+              for (const term of termRecords) {
+                const termId = term._id.toString();
+                const activitiesInThisTerm = term.activitiesScore || [];
+
+                // Filter out activities that are being moved to OTHER terms
+                const remainingActivities = activitiesInThisTerm.filter(
+                  (actScore) => {
+                    const actId = (
+                      actScore.activityId?._id || actScore.activityId
+                    ).toString();
+
+                    // Check if this activity is marked to be moved FROM this term
+                    const isMovingFromThisTerm =
+                      activitiesToMoveBetweenTerms.some(
+                        (move) =>
+                          move.fromTermId === termId &&
+                          move.activityId === actId,
+                      );
+
+                    // Check if this activity is marked to be moved TO this term (keep it)
+                    const isMovingToThisTerm =
+                      activitiesToMoveBetweenTerms.some(
+                        (move) =>
+                          move.toTermId === termId && move.activityId === actId,
+                      );
+
+                    // Keep activity if:
+                    // 1. It's not being moved at all, OR
+                    // 2. It's being moved TO this term (its correct destination)
+                    return !isMovingFromThisTerm || isMovingToThisTerm;
+                  },
+                );
+
+                // Update the term if activities were removed
+                if (
+                  remainingActivities.length !== activitiesInThisTerm.length
+                ) {
+                  await SenatorData.findByIdAndUpdate(
+                    termId,
+                    { activitiesScore: remainingActivities },
+                    { new: true },
+                  );
+                }
+              }
+
+              // SECOND: Add activities to their correct destination terms
+              for (const [toTermId, moves] of Object.entries(movesByDestTerm)) {
+                const destTerm = termRecordsMap[toTermId];
+                if (!destTerm) continue;
+
+                // Get current activities in destination term
+                const currentActivities = destTerm.activitiesScore || [];
+
+                // Create a set of activity IDs already in destination term
+                const existingActivityIds = new Set();
+                currentActivities.forEach((act) => {
+                  const actId = (
+                    act.activityId?._id || act.activityId
+                  ).toString();
+                  existingActivityIds.add(actId);
+                });
+
+                // Filter moves to only add activities that aren't already in the destination
+                const activitiesToAdd = [];
+                const duplicateActivitiesSkipped = [];
+
+                moves.forEach((move) => {
+                  if (existingActivityIds.has(move.activityId)) {
+                    duplicateActivitiesSkipped.push(move.activityId);
+                  } else {
+                    activitiesToAdd.push(move.activityScore);
+                    existingActivityIds.add(move.activityId);
+                  }
+                });
+
+                // Only update if we have activities to add
+                if (activitiesToAdd.length > 0) {
+                  const updatedActivities = [
+                    ...currentActivities,
+                    ...activitiesToAdd,
+                  ];
+
+                  await SenatorData.findByIdAndUpdate(
+                    toTermId,
+                    { activitiesScore: updatedActivities },
+                    { new: true },
+                  );
+                  if (duplicateActivitiesSkipped.length > 0) {
+                    console.log(
+                      `   Skipped ${duplicateActivitiesSkipped.length} duplicate activities already in term`,
+                    );
                   }
                 }
               }
-            } else {
-              console.log(`\n🗳️ VOTES: None`);
             }
 
-            /* -------- CHECK ACTIVITIES -------- */
-            if (Array.isArray(term.activitiesScore) && term.activitiesScore.length > 0) {
-              for (let i = 0; i < term.activitiesScore.length; i++) {
-                const actScore = term.activitiesScore[i];
-                const actDoc = actScore.activityId;
-                const actId = actDoc?._id || actScore.activityId;
-                const actDate = actDoc?.date;
-                // Check for duplicate activities
-                const actIdStr = actId.toString();
-                if (seenActivityIds.has(actIdStr)) {
-                  duplicateActivities.add(actIdStr);
-                } else {
-                  seenActivityIds.add(actIdStr);
-                }
+            /* -------- MOVE PAST VOTES TO pastVotesScore -------- */
+            // Process the ORIGINAL termRecords (not the copy) for updates
+            for (const term of termRecords) {
+              if (
+                Array.isArray(term.votesScore) &&
+                term.votesScore.length > 0
+              ) {
+                const newPastVotes = [];
+                const remainingVotes = [];
 
-                if (!actDate) {
-                  hasError = true;
-                  senatorErrors.push(`Activity (ID: ${actId}): Term is required - no date found`);
-                  continue;
-                }
+                for (const voteScore of term.votesScore) {
+                  const voteDoc = voteScore.voteId;
+                  const voteDate = voteDoc?.date;
 
-                const match = await findMatchingTerm(termRecordsCopy, terms, actDate);
+                  if (!voteDate) continue;
 
-                if (!match) {
-                  hasError = true;
-                  senatorErrors.push(`Activity (ID: ${actId}, date: ${actDate}): Term is required`);
-                } else if (match.type === "current") {
-                  // Check if activity is in the correct term
-                  const correctTermId = match.term._id.toString();
-                  const currentTermId = term._id.toString();
-                  
-                  if (correctTermId === currentTermId) {
+                  const match = findMatchingTerm(termRecords, terms, voteDate);
+
+                  if (match?.type === "past") {
+                    newPastVotes.push(voteScore);
                   } else {
-                    // Track for moving later
-                    activitiesToMoveBetweenTerms.push({
-                      fromTermId: currentTermId,
-                      toTermId: correctTermId,
-                      activityScore: actScore,
-                      activityId: actIdStr
-                    });
+                    remainingVotes.push(voteScore);
                   }
                 }
-              }
-            } else {
-              console.log(`\n🏃 ACTIVITIES: None`);
-            }
-          }
-          /* -------- REMOVE DUPLICATES WITHIN SAME TERM -------- */          
-          let sameTermDupActivities = 0;
-          let sameTermDupVotes = 0;
-          
-          // Check each term for duplicates within itself
-          for (const term of termRecords) {
-            const termId = term._id.toString();
-            
-            /* -------- CHECK ACTIVITY DUPLICATES WITHIN TERM -------- */
-            if (Array.isArray(term.activitiesScore) && term.activitiesScore.length > 0) {
-              const seenActIds = new Set();
-              const uniqueActivities = [];
-              const duplicateActIds = [];
-              
-              for (const actScore of term.activitiesScore) {
-                const actId = (actScore.activityId?._id || actScore.activityId).toString();
-                
-                if (seenActIds.has(actId)) {
-                  duplicateActIds.push(actId);
-                  sameTermDupActivities++;
-                } else {
-                  seenActIds.add(actId);
-                  uniqueActivities.push(actScore);
+
+                // Only update if we actually have votes to move
+                if (newPastVotes.length > 0) {
+                  const updatedPastVotes = [
+                    ...(term.pastVotesScore || []),
+                    ...newPastVotes,
+                  ];
+
+                  await SenatorData.findByIdAndUpdate(
+                    term._id,
+                    {
+                      votesScore: remainingVotes,
+                      pastVotesScore: updatedPastVotes,
+                    },
+                    { new: true },
+                  );
                 }
               }
-              
-              // Update if duplicates found
-              if (duplicateActIds.length > 0) {
-                await SenatorData.findByIdAndUpdate(
-                  termId,
-                  { activitiesScore: uniqueActivities },
-                  { new: true }
-                );
-              }
             }
-            
-            /* -------- CHECK VOTE DUPLICATES WITHIN TERM -------- */
-            if (Array.isArray(term.votesScore) && term.votesScore.length > 0) {
-              const seenVoteIds = new Set();
-              const uniqueVotes = [];
-              const duplicateVoteIds = [];
-              
-              for (const voteScore of term.votesScore) {
-                const voteId = (voteScore.voteId?._id || voteScore.voteId).toString();
-                
-                if (seenVoteIds.has(voteId)) {
-                  duplicateVoteIds.push(voteId);
-                  sameTermDupVotes++;
-                } else {
-                  seenVoteIds.add(voteId);
-                  uniqueVotes.push(voteScore);
-                }
-              }
-              
-              // Update if duplicates found
-              if (duplicateVoteIds.length > 0) {
-                await SenatorData.findByIdAndUpdate(
-                  termId,
-                  { votesScore: uniqueVotes },
-                  { new: true }
-                );
-              }
-            }
-          }
-          // If ANY critical error found, skip this senator entirely
-          if (hasError) {
+            await Senator.findByIdAndUpdate(
+              senateId,
+              {
+                publishStatus: "published",
+                editedFields: [],
+                fieldEditors: {},
+                history: [],
+              },
+              { new: true },
+            );
+
+            successCount++;
+          } else {
             errors.push({
               senatorId: senateId,
-              message: "Critical errors found",
-              details: senatorErrors,
+              message: "No term records found",
             });
-            continue;
           }
-          // Create a map of term records for easy access
-          const termRecordsMap = {};
-          termRecords.forEach(tr => {
-            termRecordsMap[tr._id.toString()] = tr;
-          });
-
-          /* -------- MOVE MISPLACED VOTES BETWEEN TERMS -------- */
-          if (votesToMoveBetweenTerms.length > 0) {            
-            // Group moves by destination term and track which votes are being moved
-            const movesByDestTerm = {};
-            const votesBeingMoved = new Set(); // Track vote IDs that are being moved
-            
-            votesToMoveBetweenTerms.forEach(move => {
-              if (!movesByDestTerm[move.toTermId]) {
-                movesByDestTerm[move.toTermId] = [];
-              }
-              movesByDestTerm[move.toTermId].push(move);
-              votesBeingMoved.add(move.voteId);
-            });
-
-            // FIRST: Remove votes from ALL terms where they shouldn't be
-            // A vote should only exist in its correct term
-            const votesToRemoveFromAllTerms = new Set(votesBeingMoved);
-            
-            // Process each term to remove votes that are being moved elsewhere
-            for (const term of termRecords) {
-              const termId = term._id.toString();
-              const votesInThisTerm = term.votesScore || [];
-              
-              // Filter out votes that are being moved to OTHER terms
-              // But keep votes that are staying in this term (correct placement)
-              const remainingVotes = votesInThisTerm.filter(voteScore => {
-                const voteId = (voteScore.voteId?._id || voteScore.voteId).toString();
-                
-                // Check if this vote is marked to be moved FROM this term
-                const isMovingFromThisTerm = votesToMoveBetweenTerms.some(
-                  move => move.fromTermId === termId && move.voteId === voteId
-                );
-                
-                // Check if this vote is marked to be moved TO this term (keep it)
-                const isMovingToThisTerm = votesToMoveBetweenTerms.some(
-                  move => move.toTermId === termId && move.voteId === voteId
-                );
-                
-                // Keep vote if:
-                // 1. It's not being moved at all, OR
-                // 2. It's being moved TO this term (its correct destination)
-                return !isMovingFromThisTerm || isMovingToThisTerm;
-              });
-              
-              // Update the term if votes were removed
-              if (remainingVotes.length !== votesInThisTerm.length) {
-                await SenatorData.findByIdAndUpdate(
-                  termId,
-                  { votesScore: remainingVotes },
-                  { new: true }
-                );
-              }
-            }
-
-            // SECOND: Add votes to their correct destination terms
-            // But first, ensure we don't add duplicates
-            for (const [toTermId, moves] of Object.entries(movesByDestTerm)) {
-              const destTerm = termRecordsMap[toTermId];
-              if (!destTerm) continue;
-              
-              // Get current votes in destination term
-              const currentVotes = destTerm.votesScore || [];
-              
-              // Create a set of vote IDs already in destination term
-              const existingVoteIds = new Set();
-              currentVotes.forEach(vote => {
-                const voteId = (vote.voteId?._id || vote.voteId).toString();
-                existingVoteIds.add(voteId);
-              });
-              
-              // Filter moves to only add votes that aren't already in the destination
-              const votesToAdd = [];
-              const duplicateVotesSkipped = [];
-              
-              moves.forEach(move => {
-                if (existingVoteIds.has(move.voteId)) {
-                  duplicateVotesSkipped.push(move.voteId);
-                } else {
-                  votesToAdd.push(move.voteScore);
-                  existingVoteIds.add(move.voteId); // Add to set to prevent duplicates in this batch
-                }
-              });
-              
-              // Only update if we have votes to add
-              if (votesToAdd.length > 0) {
-                const updatedVotes = [...currentVotes, ...votesToAdd];
-                
-                await SenatorData.findByIdAndUpdate(
-                  toTermId,
-                  { votesScore: updatedVotes },
-                  { new: true }
-                );
-                
-              }
-            }
-          }
-
-          /* -------- MOVE MISPLACED ACTIVITIES BETWEEN TERMS -------- */
-          if (activitiesToMoveBetweenTerms.length > 0) {            
-            // Group moves by destination term and track which activities are being moved
-            const movesByDestTerm = {};
-            const activitiesBeingMoved = new Set();
-            
-            activitiesToMoveBetweenTerms.forEach(move => {
-              if (!movesByDestTerm[move.toTermId]) {
-                movesByDestTerm[move.toTermId] = [];
-              }
-              movesByDestTerm[move.toTermId].push(move);
-              activitiesBeingMoved.add(move.activityId);
-            });
-
-            // FIRST: Remove activities from ALL terms where they shouldn't be
-            const activitiesToRemoveFromAllTerms = new Set(activitiesBeingMoved);
-            
-            // Process each term to remove activities that are being moved elsewhere
-            for (const term of termRecords) {
-              const termId = term._id.toString();
-              const activitiesInThisTerm = term.activitiesScore || [];
-              
-              // Filter out activities that are being moved to OTHER terms
-              const remainingActivities = activitiesInThisTerm.filter(actScore => {
-                const actId = (actScore.activityId?._id || actScore.activityId).toString();
-                
-                // Check if this activity is marked to be moved FROM this term
-                const isMovingFromThisTerm = activitiesToMoveBetweenTerms.some(
-                  move => move.fromTermId === termId && move.activityId === actId
-                );
-                
-                // Check if this activity is marked to be moved TO this term (keep it)
-                const isMovingToThisTerm = activitiesToMoveBetweenTerms.some(
-                  move => move.toTermId === termId && move.activityId === actId
-                );
-                
-                // Keep activity if:
-                // 1. It's not being moved at all, OR
-                // 2. It's being moved TO this term (its correct destination)
-                return !isMovingFromThisTerm || isMovingToThisTerm;
-              });
-              
-              // Update the term if activities were removed
-              if (remainingActivities.length !== activitiesInThisTerm.length) {
-                await SenatorData.findByIdAndUpdate(
-                  termId,
-                  { activitiesScore: remainingActivities },
-                  { new: true }
-                );
-              }
-            }
-
-            // SECOND: Add activities to their correct destination terms
-            for (const [toTermId, moves] of Object.entries(movesByDestTerm)) {
-              const destTerm = termRecordsMap[toTermId];
-              if (!destTerm) continue;
-              
-              // Get current activities in destination term
-              const currentActivities = destTerm.activitiesScore || [];
-              
-              // Create a set of activity IDs already in destination term
-              const existingActivityIds = new Set();
-              currentActivities.forEach(act => {
-                const actId = (act.activityId?._id || act.activityId).toString();
-                existingActivityIds.add(actId);
-              });
-              
-              // Filter moves to only add activities that aren't already in the destination
-              const activitiesToAdd = [];
-              const duplicateActivitiesSkipped = [];
-              
-              moves.forEach(move => {
-                if (existingActivityIds.has(move.activityId)) {
-                  duplicateActivitiesSkipped.push(move.activityId);
-                } else {
-                  activitiesToAdd.push(move.activityScore);
-                  existingActivityIds.add(move.activityId);
-                }
-              });
-              
-              // Only update if we have activities to add
-              if (activitiesToAdd.length > 0) {
-                const updatedActivities = [...currentActivities, ...activitiesToAdd];
-                
-                await SenatorData.findByIdAndUpdate(
-                  toTermId,
-                  { activitiesScore: updatedActivities },
-                  { new: true }
-                );
-                if (duplicateActivitiesSkipped.length > 0) {
-                  console.log(`   Skipped ${duplicateActivitiesSkipped.length} duplicate activities already in term`);
-                }
-              }
-            }
-          }
-
-          /* -------- MOVE PAST VOTES TO pastVotesScore -------- */
-          // Process the ORIGINAL termRecords (not the copy) for updates
-          for (const term of termRecords) {
-            if (Array.isArray(term.votesScore) && term.votesScore.length > 0) {
-              const newPastVotes = [];
-              const remainingVotes = [];
-
-              for (const voteScore of term.votesScore) {
-                const voteDoc = voteScore.voteId;
-                const voteDate = voteDoc?.date;
-                
-                if (!voteDate) continue;
-
-                const match = findMatchingTerm(termRecords, terms, voteDate);
-                
-                if (match?.type === "past") {
-                  newPastVotes.push(voteScore);
-                } else {
-                  remainingVotes.push(voteScore);
-                }
-              }
-
-              // Only update if we actually have votes to move
-              if (newPastVotes.length > 0) {
-                const updatedPastVotes = [...(term.pastVotesScore || []), ...newPastVotes];
-                
-                await SenatorData.findByIdAndUpdate(
-                  term._id,
-                  {
-                    votesScore: remainingVotes,
-                    pastVotesScore: updatedPastVotes,
-                  },
-                  { new: true }
-                );
-              }
-            }
-          }
-          await Senator.findByIdAndUpdate(
-            senateId,
-            {
-              publishStatus: "published",
-              editedFields: [],
-              fieldEditors: {},
-              history: [],
-            },
-            { new: true }
+        } catch (err) {
+          console.error(
+            `❌ FAILED TO PROCESS SENATOR ${senateId}:`,
+            err.message,
           );
-
-          successCount++;
-
-        } else {
+          console.error(err.stack);
           errors.push({
             senatorId: senateId,
-            message: "No term records found",
+            message: err.message,
           });
         }
-      } catch (err) {
-        console.error(`❌ FAILED TO PROCESS SENATOR ${senateId}:`, err.message);
-        console.error(err.stack);
-        errors.push({
-          senatorId: senateId,
-          message: err.message,
-        });
       }
+
+      return res.status(200).json({
+        successCount,
+        totalCount: senatorIds.length,
+        message: `Bulk publish completed for ${successCount}/${senatorIds.length} senators`,
+        errors: errors.length > 0 ? errors : null,
+      });
+    } catch (err) {
+      console.error("🔥 BULK PUBLISH API ERROR:", err.message);
+      console.error(err.stack);
+      return res.status(500).json({ message: err.message });
     }
-
-
-    return res.status(200).json({
-      successCount,
-      totalCount: senatorIds.length,
-      message: `Bulk publish completed for ${successCount}/${senatorIds.length} senators`,
-      errors: errors.length > 0 ? errors : null,
-    });
-  } catch (err) {
-    console.error("🔥 BULK PUBLISH API ERROR:", err.message);
-    console.error(err.stack);
-    return res.status(500).json({ message: err.message });
   }
-}
 }
 
 module.exports = senatorDataController;

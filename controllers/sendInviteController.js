@@ -35,7 +35,7 @@ const sendInvite = async (req, res) => {
       invitedAt: new Date(),
     });
 
-    const baseUrl = "https://demos.godigitalalchemy.com";
+    const baseUrl = "https://demos.godigitalalchemy.com/scorecard/admin";
 
     const activationUrl = `${baseUrl}/activate-account?token=${inviteToken}`;
     const emailContent = `
